@@ -1,15 +1,37 @@
 import React from "react";
 import { AbsoluteFill, Audio, interpolate, spring, staticFile, useCurrentFrame, useVideoConfig } from "remotion";
-import { BOX, colors, font } from "../theme";
 
 // Narration is 8.11s -> ceil(8.11*30) + 30 = 274 frames; all 4 merge steps finish by ~frame 240.
 export const DURATION = 274;
 
-const GAP = 96; // distance between box centers
-const LIST_Y = 230;
-const OUT_Y = 500;
-const LEFT_CX = 340;
-const RIGHT_CX = 940;
+// ---- Scene palette: "two queues on a stage with spotlights" ----
+const P = {
+  stage: "#0b0b0f",
+  backdrop: "#15121c",
+  floorTop: "#8a5a32",
+  floorBottom: "#3b2414",
+  floorLine: "rgba(0,0,0,0.35)",
+  amber: "#f59e0b",
+  amberDark: "#b45309",
+  teal: "#14b8a6",
+  tealDark: "#0f766e",
+  led: "#ffb000",
+  ledDim: "rgba(255,176,0,0.12)",
+  gold: "#ffd34d",
+  goldDark: "#c8940c",
+  text: "#fff7e6",
+  muted: "#9a8f80",
+  light: "#fff3b0",
+};
+const MONO = "Consolas, 'Courier New', monospace";
+const SANS = "'Segoe UI', Helvetica, Arial, sans-serif";
+
+// ---- Layout ----
+const TILE = 92;
+const STEP_H = TILE + 12; // vertical distance between stacked tiles
+const FLOOR_Y = 612; // tiles stand on this line
+const LEFT_CX = 290;
+const RIGHT_CX = 990;
 const OUT_CX = 640;
 
 type Item = { value: number; list: "left" | "right"; idx: number };
@@ -30,171 +52,294 @@ const STEPS = [
 
 const FIRST_STEP = 40;
 const STEP_LEN = 48;
-const COMPARE_LEN = 18; // highlight before moving
+const COMPARE_LEN = 18; // spotlight before moving
 const MOVE_LEN = 20;
 const GREEN_AT = FIRST_STEP + STEP_LEN * 4 + 5;
 
 const stepStart = (k: number) => FIRST_STEP + STEP_LEN * k;
-const slotX = (cx: number, i: number, n: number) => cx + (i - (n - 1) / 2) * GAP - BOX / 2;
+const clamp = { extrapolateLeft: "clamp", extrapolateRight: "clamp" } as const;
 
-const homeX = (it: Item) => slotX(it.list === "left" ? LEFT_CX : RIGHT_CX, it.idx, 2);
+// top-left Y of a tile sitting at height level h (0 = on the floor)
+const levelY = (h: number) => FLOOR_Y - TILE - h * STEP_H;
+const colX = (cx: number) => cx - TILE / 2;
+const listCX = (it: Item) => (it.list === "left" ? LEFT_CX : RIGHT_CX);
 
-const Box: React.FC<{ value: number; x: number; y: number; fill: string; border: string; scale?: number; glow?: string; opacity?: number }> = ({ value, x, y, fill, border, scale = 1, glow, opacity = 1 }) => (
+const Tile: React.FC<{
+  value: number;
+  x: number;
+  y: number;
+  face: string;
+  edge: string;
+  scale?: number;
+  glow?: string;
+  opacity?: number;
+  z?: number;
+}> = ({ value, x, y, face, edge, scale = 1, glow, opacity = 1, z = 1 }) => (
   <div
     style={{
       position: "absolute",
       left: x,
       top: y,
-      width: BOX,
-      height: BOX,
-      borderRadius: 14,
-      background: fill,
-      border: `4px solid ${border}`,
+      width: TILE,
+      height: TILE,
+      borderRadius: 4,
+      background: `linear-gradient(160deg, ${face} 0%, ${edge} 100%)`,
+      borderBottom: `8px solid ${edge}`,
       boxSizing: "border-box",
       display: "flex",
       justifyContent: "center",
       alignItems: "center",
-      fontSize: 32,
-      fontWeight: 700,
-      color: colors.text,
+      fontFamily: SANS,
+      fontSize: 42,
+      fontWeight: 900,
+      color: "#1a1208",
+      textShadow: "0 1px 0 rgba(255,255,255,0.35)",
       transform: `scale(${scale})`,
-      boxShadow: glow ? `0 0 24px ${glow}` : undefined,
+      boxShadow: glow ? `0 0 34px 6px ${glow}, 0 10px 18px rgba(0,0,0,0.6)` : "0 10px 18px rgba(0,0,0,0.6)",
       opacity,
+      zIndex: z,
     }}
   >
     {value}
   </div>
 );
 
-const Pointer: React.FC<{ x: number; opacity: number }> = ({ x, opacity }) => (
-  <svg width={40} height={30} style={{ position: "absolute", left: x + BOX / 2 - 20, top: LIST_Y - 44, opacity }}>
-    <polygon points="0,0 40,0 20,28" fill={colors.accent} />
-  </svg>
-);
+// A cone of light from a lamp above the stage down onto a tile position
+const Spotlight: React.FC<{ id: string; cx: number; targetY: number; opacity: number }> = ({ id, cx, targetY, opacity }) => {
+  const srcX = cx + (cx < OUT_CX ? 90 : -90);
+  const half = TILE * 0.95;
+  const bottom = targetY + TILE + 6;
+  return (
+    <svg width={1280} height={720} style={{ position: "absolute", left: 0, top: 0, opacity, pointerEvents: "none" }}>
+      <defs>
+        <radialGradient id={`cone-${id}`} cx={srcX} cy={0} r={bottom} gradientUnits="userSpaceOnUse">
+          <stop offset="0%" stopColor={P.light} stopOpacity={0.55} />
+          <stop offset="100%" stopColor={P.light} stopOpacity={0.12} />
+        </radialGradient>
+        <radialGradient id={`pool-${id}`}>
+          <stop offset="0%" stopColor={P.light} stopOpacity={0.55} />
+          <stop offset="100%" stopColor={P.light} stopOpacity={0} />
+        </radialGradient>
+      </defs>
+      <polygon points={`${srcX - 14},0 ${srcX + 14},0 ${cx + half},${bottom} ${cx - half},${bottom}`} fill={`url(#cone-${id})`} />
+      <ellipse cx={cx} cy={bottom} rx={half * 1.25} ry={16} fill={`url(#pool-${id})`} />
+      {/* lamp housing */}
+      <rect x={srcX - 22} y={-6} width={44} height={20} rx={4} fill="#2a2a33" />
+    </svg>
+  );
+};
 
 export const Scene3_Merge: React.FC = () => {
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
 
   const intro = spring({ frame, fps, config: { damping: 14 } });
-  const labelFade = interpolate(frame, [10, 30], [0, 1], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
-  const green = interpolate(frame, [GREEN_AT, GREEN_AT + 15], [0, 1], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
+  const labelFade = interpolate(frame, [10, 30], [0, 1], clamp);
+  const gold = interpolate(frame, [GREEN_AT, GREEN_AT + 15], [0, 1], clamp);
+  const doneFade = interpolate(frame, [GREEN_AT + 5, GREEN_AT + 20], [0, 1], clamp);
 
-  // Progress of each item's move (0 = in its list, 1 = in output)
   const moveProgress = (k: number) =>
     spring({ frame: frame - (stepStart(k) + COMPARE_LEN), fps, config: { damping: 14 }, durationInFrames: MOVE_LEN });
 
-  // Current step = last one that has started
   const current = STEPS.reduce((acc, _s, k) => (frame >= stepStart(k) ? k : acc), -1);
-  const comparing = current >= 0 && frame < stepStart(current) + COMPARE_LEN + MOVE_LEN ? STEPS[current].compare : [];
+  const inCompare = (k: number) => frame >= stepStart(k) && frame < stepStart(k) + COMPARE_LEN + MOVE_LEN * 0.5;
 
-  // Pointer positions: front index = number of items already taken from each list (animated)
-  const taken = (list: "left" | "right") =>
+  // How many items have left each list (animated), used to drop the remaining tiles down
+  const takenBefore = (it: Item, i: number) =>
+    STEPS.reduce((acc, s, k) => {
+      const o = ITEMS[s.item];
+      return s.item !== i && o.list === it.list && o.idx < it.idx ? acc + moveProgress(k) : acc;
+    }, 0);
+  const takenFrom = (list: "left" | "right") =>
     STEPS.reduce((acc, s, k) => (ITEMS[s.item].list === list ? acc + moveProgress(k) : acc), 0);
-  const leftFront = taken("left");
-  const rightFront = taken("right");
-  const pointerX = (cx: number, f: number) => slotX(cx, 0, 2) + Math.min(f, 1) * GAP;
-  const pointersOn = interpolate(frame, [FIRST_STEP - 15, FIRST_STEP], [0, 1], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
-  const pointersOff = interpolate(frame, [GREEN_AT - 10, GREEN_AT], [1, 0], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
-  const leftPointerOpacity = pointersOn * pointersOff * interpolate(leftFront, [1, 1.8], [1, 0], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
-  const rightPointerOpacity = pointersOn * pointersOff * interpolate(rightFront, [1, 1.8], [1, 0], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
+  const leftEmpty = interpolate(takenFrom("left"), [1.8, 2], [0, 1], clamp) * (1 - doneFade);
+
+  // Spotlights: one per compared item, fading in/out around each compare phase
+  const spot = (i: number) =>
+    STEPS.reduce((acc, s, k) => {
+      if (!s.compare.includes(i)) return acc;
+      const t = frame - stepStart(k);
+      const on = interpolate(t, [0, 6], [0, 1], clamp) * interpolate(t, [COMPARE_LEN + 2, COMPARE_LEN + 12], [1, 0], clamp);
+      return Math.max(acc, on);
+    }, 0);
 
   const stepText = current >= 0 && frame < GREEN_AT ? STEPS[current].text : "";
-  const textFade = current >= 0 ? interpolate(frame - stepStart(current), [0, 8], [0, 1], { extrapolateRight: "clamp" }) : 0;
+  const textFade = current >= 0 ? interpolate(frame - stepStart(current), [0, 8], [0, 1], clamp) : 0;
+  const ledFlicker = 0.85 + 0.15 * Math.sin(frame * 0.9);
 
-  const leftEmpty = interpolate(leftFront, [1.8, 2], [0, 1], { extrapolateLeft: "clamp", extrapolateRight: "clamp" }) * pointersOff;
-  const doneFade = interpolate(frame, [GREEN_AT + 5, GREEN_AT + 20], [0, 1], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
-
-  const label = (text: string, cx: number, y: number, color: string, opacity: number) => (
-    <div style={{ position: "absolute", left: cx - 200, width: 400, top: y, textAlign: "center", fontSize: 28, fontWeight: 600, color, opacity }}>{text}</div>
+  const floorLabel = (text: string, cx: number, color: string, opacity: number) => (
+    <div
+      style={{
+        position: "absolute",
+        left: cx - 140,
+        width: 280,
+        top: FLOOR_Y + 26,
+        textAlign: "center",
+        fontFamily: MONO,
+        fontSize: 24,
+        fontWeight: 700,
+        letterSpacing: 6,
+        color,
+        opacity,
+      }}
+    >
+      {text}
+    </div>
   );
 
+  const resultTop = levelY(3);
+
   return (
-    <AbsoluteFill style={{ background: colors.bg, color: colors.text, fontFamily: font }}>
+    <AbsoluteFill style={{ background: P.stage, fontFamily: SANS, color: P.text, overflow: "hidden" }}>
       <Audio src={staticFile("audio/scene3.wav")} />
 
-      <div style={{ position: "absolute", top: 40, width: "100%", textAlign: "center", fontSize: 48, fontWeight: 700, opacity: labelFade }}>
+      {/* back wall: soft vignette */}
+      <AbsoluteFill style={{ background: `radial-gradient(ellipse 70% 60% at 50% 70%, ${P.backdrop} 0%, ${P.stage} 75%)` }} />
+
+      {/* wooden floor strip */}
+      <div
+        style={{
+          position: "absolute",
+          left: 0,
+          right: 0,
+          top: FLOOR_Y,
+          bottom: 0,
+          background: `repeating-linear-gradient(90deg, transparent 0 158px, ${P.floorLine} 158px 160px), linear-gradient(180deg, ${P.floorTop} 0%, ${P.floorBottom} 100%)`,
+          borderTop: "3px solid #b07a48",
+          boxShadow: "0 -6px 30px rgba(0,0,0,0.6) inset",
+        }}
+      />
+
+      {/* title */}
+      <div style={{ position: "absolute", top: 26, width: "100%", textAlign: "center", fontSize: 40, fontWeight: 800, letterSpacing: 1, opacity: labelFade }}>
         Merging two sorted lists
       </div>
 
-      {label("Left (sorted)", LEFT_CX, LIST_Y + BOX + 20, colors.left, labelFade)}
-      {label("Right (sorted)", RIGHT_CX, LIST_Y + BOX + 20, colors.right, labelFade)}
-      <div style={{ position: "absolute", left: LEFT_CX - 200, width: 400, top: LIST_Y + BOX + 62, textAlign: "center", fontSize: 22, fontWeight: 500, fontStyle: "italic", color: colors.muted, opacity: leftEmpty }}>
-        empty
-      </div>
-
-      {/* Used-up slots: faded dashed outline where each removed item was */}
+      {/* spotlights on compared front tiles */}
       {ITEMS.map((it, i) => {
-        const k = STEPS.findIndex((s) => s.item === i);
-        const ghost = interpolate(moveProgress(k), [0, 0.4], [0, 0.6], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
-        return (
-          <div
-            key={`ghost-${i}`}
-            style={{
-              position: "absolute",
-              left: homeX(it),
-              top: LIST_Y,
-              width: BOX,
-              height: BOX,
-              borderRadius: 14,
-              border: `3px dashed ${it.list === "left" ? colors.left : colors.right}`,
-              boxSizing: "border-box",
-              opacity: ghost,
-            }}
-          />
-        );
+        const s = spot(i);
+        if (s <= 0) return null;
+        return <Spotlight key={`spot-${i}`} id={String(i)} cx={listCX(it)} targetY={levelY(0)} opacity={s * 0.8} />;
       })}
 
-      {/* Comparison caption */}
-      <div style={{ position: "absolute", top: LIST_Y + 14, left: OUT_CX - 170, width: 340, textAlign: "center", fontSize: 30, fontWeight: 600, color: colors.accent, opacity: textFade }}>
-        {stepText}
+      {/* LED scoreboard */}
+      <div
+        style={{
+          position: "absolute",
+          left: OUT_CX - 290,
+          width: 580,
+          top: 92,
+          height: 74,
+          background: `radial-gradient(circle, ${P.ledDim} 1.2px, transparent 1.6px) 0 0 / 7px 7px, #050505`,
+          border: "3px solid #2b2b2b",
+          borderRadius: 8,
+          boxShadow: "0 0 0 2px #111, 0 8px 24px rgba(0,0,0,0.7)",
+          display: "flex",
+          justifyContent: "center",
+          alignItems: "center",
+          fontFamily: MONO,
+          fontSize: 34,
+          fontWeight: 700,
+          letterSpacing: 2,
+          color: doneFade > 0 ? P.gold : P.led,
+          textShadow: `0 0 8px ${doneFade > 0 ? P.gold : P.led}, 0 0 18px ${doneFade > 0 ? P.gold : P.led}`,
+          opacity: labelFade,
+        }}
+      >
+        <span style={{ opacity: (doneFade > 0 ? doneFade : textFade * ledFlicker) }}>
+          {doneFade > 0 ? "Sorted! [3, 27, 38, 43]" : stepText}
+        </span>
       </div>
 
-      {/* Output slots */}
-      {[0, 1, 2, 3].map((i) => (
+      {/* result column backing + empty slots */}
+      <div
+        style={{
+          position: "absolute",
+          left: colX(OUT_CX) - 16,
+          width: TILE + 32,
+          top: resultTop - 16,
+          height: FLOOR_Y - resultTop + 16,
+          borderRadius: "10px 10px 0 0",
+          background: `rgba(255,211,77,${0.04 + 0.1 * gold})`,
+          border: `2px solid rgba(255,211,77,${0.25 + 0.6 * gold})`,
+          borderBottom: "none",
+          boxShadow: gold > 0 ? `0 0 ${50 * gold}px ${10 * gold}px rgba(255,211,77,0.35)` : undefined,
+          opacity: labelFade,
+        }}
+      />
+      {[0, 1, 2, 3].map((h) => (
         <div
-          key={i}
+          key={h}
           style={{
             position: "absolute",
-            left: slotX(OUT_CX, i, 4),
-            top: OUT_Y,
-            width: BOX,
-            height: BOX,
-            borderRadius: 14,
-            border: `3px dashed ${colors.boxBorder}`,
+            left: colX(OUT_CX),
+            top: levelY(h),
+            width: TILE,
+            height: TILE,
+            borderRadius: 4,
+            border: "2px dashed rgba(255,211,77,0.3)",
             boxSizing: "border-box",
             opacity: labelFade,
           }}
         />
       ))}
-      {label("Result", OUT_CX, OUT_Y + BOX + 20, colors.muted, labelFade * (1 - doneFade))}
-      {label("Sorted: [3, 27, 38, 43]", OUT_CX, OUT_Y + BOX + 20, colors.sorted, doneFade)}
 
-      <Pointer x={pointerX(LEFT_CX, leftFront)} opacity={leftPointerOpacity} />
-      <Pointer x={pointerX(RIGHT_CX, rightFront)} opacity={rightPointerOpacity} />
+      {/* faded outline where the left stack used to stand once it is empty */}
+      <div
+        style={{
+          position: "absolute",
+          left: colX(LEFT_CX),
+          top: levelY(0),
+          width: TILE,
+          height: TILE,
+          borderRadius: 4,
+          border: `3px dashed ${P.amber}`,
+          boxSizing: "border-box",
+          display: "flex",
+          justifyContent: "center",
+          alignItems: "center",
+          fontFamily: MONO,
+          fontSize: 18,
+          color: P.amber,
+          opacity: leftEmpty * 0.6,
+        }}
+      >
+        empty
+      </div>
 
+      {floorLabel("LEFT", LEFT_CX, P.amber, labelFade)}
+      {floorLabel("RESULT", OUT_CX, gold > 0 ? P.gold : P.text, labelFade)}
+      {floorLabel("RIGHT", RIGHT_CX, P.teal, labelFade)}
+
+      {/* tiles */}
       {ITEMS.map((it, i) => {
         const k = STEPS.findIndex((s) => s.item === i);
         const p = moveProgress(k);
-        const x = interpolate(p, [0, 1], [homeX(it), slotX(OUT_CX, k, 4)]);
-        const y = interpolate(p, [0, 1], [LIST_Y, OUT_Y]);
-        const isCompared = comparing.includes(i) && p < 0.5;
-        const isTaken = current === k && frame >= stepStart(k) && p < 1;
-        const base = it.list === "left" ? colors.left : colors.right;
-        const border = green > 0 ? colors.sorted : isCompared ? colors.accent : base;
-        const fill = green > 0 ? colors.sorted : colors.box;
-        const lift = isTaken ? 1 + 0.12 * Math.sin(Math.PI * p) : 1;
+        const homeH = it.idx - takenBefore(it, i);
+        const fromX = colX(listCX(it));
+        const fromY = levelY(homeH);
+        const toX = colX(OUT_CX);
+        const toY = levelY(k);
+        const x = interpolate(p, [0, 1], [fromX, toX]);
+        const arc = Math.sin(Math.PI * Math.min(Math.max(p, 0), 1)) * 70;
+        const y = interpolate(p, [0, 1], [fromY, toY]) - arc;
+        const isLeft = it.list === "left";
+        const lit = spot(i) > 0.3 && p < 0.5;
+        const face = gold > 0 ? P.gold : isLeft ? P.amber : P.teal;
+        const edge = gold > 0 ? P.goldDark : isLeft ? P.amberDark : P.tealDark;
+        const pulse = gold > 0 ? 1 + 0.08 * Math.sin(Math.PI * gold) : 1;
         return (
-          <Box
+          <Tile
             key={i}
             value={it.value}
             x={x}
-            y={y + (1 - intro) * 40}
-            fill={fill}
-            border={border}
-            scale={lift * (green > 0 ? 1 + 0.08 * Math.sin(Math.PI * green) : 1)}
-            glow={isCompared ? colors.accent : green > 0 ? colors.sorted : undefined}
+            y={y + (1 - intro) * 60}
+            face={face}
+            edge={edge}
+            scale={pulse * (lit ? 1.06 : 1)}
+            glow={gold > 0 ? "rgba(255,211,77,0.6)" : lit ? "rgba(255,243,176,0.45)" : undefined}
             opacity={intro}
+            z={p > 0.01 && p < 0.99 ? 3 : 1}
           />
         );
       })}
