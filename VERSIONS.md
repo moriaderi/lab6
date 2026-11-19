@@ -25,3 +25,4 @@ Each scene version is a git commit tagged `sceneN-vK`. Restore one with:
 |------|--------|-------|
 | out/test-clip.mp4 | `36b00e8` | 5s stack test (Remotion + Kokoro narration) |
 | out/render-01.mp4 | `36544cf` | First full video: all scenes at v1 (~58s) |
+| out/render-02.mp4 | `3a5fbd8` | All scenes v2 (scene 2 v3): continuity, cut lines, accurate levels |
