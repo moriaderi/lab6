@@ -6,6 +6,7 @@ Each scene version is a git commit tagged `sceneN-vK`. Restore one with:
 | Tag | Scene | What changed / why |
 |-----|-------|--------------------|
 | — | all | `83ba423` scaffold: one file per scene so agents can work in parallel |
+| scene1-v1 | 1 Intro | First version: title pops in, 7 unsorted boxes slide in, "divide → merge" pills timed to narration (7.6s) |
 
 ## Renders
 | File | Commit | Notes |
