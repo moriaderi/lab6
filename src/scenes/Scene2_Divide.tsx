@@ -78,7 +78,7 @@ export const Scene2_Divide: React.FC = () => {
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
 
-  const progress = LEVEL_START.map((s, l) => (l === 0 ? spring({ frame, fps, config: { damping: 14 } }) : spring({ frame: frame - s, fps, config: { damping: 15 } })));
+  const progress = LEVEL_START.map((s, l) => (l === 0 ? 1 : spring({ frame: frame - s, fps, config: { damping: 15 } })));
   const sortedGlow = interpolate(frame, [SORTED_AT, SORTED_AT + 20], [0, 1], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
 
   const caption = [...CAPTIONS].reverse().find((c) => frame >= c.from)!;

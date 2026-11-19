@@ -14,6 +14,7 @@ Each scene version is a git commit tagged `sceneN-vK`. Restore one with:
 | scene6-v1 | 6 Recap | First version: three cards Divide / Merge / O(n log n), sorted array glows green (7.4s + hold)
 | scene1-v2 | 1 Intro | Last 25 frames: title fades, boxes ease into Scene 2's top-row position and 'Divide' title for a seamless cut
 | scene2-v2 | 2 Divide | Dashed cyan cut line appears where each split will happen, ~14 frames before halves slide apart
+| scene2-v3 | 2 Divide | Top row starts fully visible at frame 0 (no spring-in), so the Scene 1 -> 2 cut is pixel-identical
 | scene3-v2 | 3 Merge | Used-up slots stay as faded dashed outlines + 'empty' label, so lists don't vanish and pointers never float over nothing
 | scene4-v2 | 4 Build Up | Label 'fours' -> 'halves' (group of 3 existed); faint tree lines show which pieces merge into which
 | scene5-v2 | 5 Complexity | Accuracy fix: n=8 has 3 merge levels, not 4 -> 'n work' labels moved between rows, brace says log2 8 = 3 levels
