@@ -19,6 +19,13 @@ Each scene version is a git commit tagged `sceneN-vK`. Restore one with:
 | scene4-v2 | 4 Build Up | Label 'fours' -> 'halves' (group of 3 existed); faint tree lines show which pieces merge into which
 | scene5-v2 | 5 Complexity | Accuracy fix: n=8 has 3 merge levels, not 4 -> 'n work' labels moved between rows, brace says log2 8 = 3 levels
 | scene6-v2 | 6 Recap | Merge card text fits one line; sorted array moved up with '[38,...] -> sorted' label
+| — | all | Round 3 small tweaks stopped and discarded: user asked for each scene to look different, not more polish on the same look
+| scene1-v3 | 1 Intro | REDESIGN: playing cards on green casino felt, gold serif title, divide/merge poker chips
+| scene2-v4 | 2 Divide | REDESIGN: engineering blueprint grid, white line-art cells, L/R labels, red scissor cut lines, title block
+| scene3-v3 | 3 Merge | REDESIGN: dark stage with spotlights, vertical stacks, LED scoreboard captions, result column glows gold
+| scene4-v3 | 4 Build Up | REDESIGN: light bar chart (height = value), same bars rearrange in place into a staircase
+| scene5-v3 | 5 Complexity | REDESIGN: chalkboard with wooden frame, hand-drawn chalk boxes, text written on, double-underlined O(n log n)
+| scene6-v3 | 6 Recap | REDESIGN: synthwave neon, scrolling grid floor + striped sun, 01/02/03 neon panels, AICODE credit
 
 ## Renders
 | File | Commit | Notes |
