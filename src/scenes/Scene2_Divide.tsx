@@ -11,6 +11,7 @@ const GROUP_GAP = [0, 90, 56, 36]; // gap between groups per level
 const ROW_Y = [90, 215, 340, 465]; // top of each row
 const LEVEL_START = [0, 25, 85, 140]; // frame each level splits (timed to narration)
 const SORTED_AT = 215; // "A single number is already sorted"
+const CUT_LEAD = 14; // frames the dashed cut line shows before each split
 
 type Group = { start: number; end: number; side: "root" | "left" | "right" }; // end exclusive
 
@@ -53,6 +54,15 @@ const layout = (groups: Group[], gap: number): number[] => {
 };
 
 const XS = LEVELS.map((groups, l) => layout(groups, GROUP_GAP[l]));
+
+// x of each cut in the parent row for level l (between the two boxes where it splits)
+const cutXs = (l: number): number[] =>
+  LEVELS[l - 1]
+    .filter((g) => g.end - g.start > 1)
+    .map((g) => {
+      const mid = g.start + Math.ceil((g.end - g.start) / 2);
+      return (XS[l - 1][mid - 1] + SIZE + XS[l - 1][mid]) / 2;
+    });
 
 const sideOf = (l: number, i: number) => LEVELS[l].find((g) => i >= g.start && i < g.end)!.side;
 const sideColor = (side: Group["side"]) => (side === "left" ? colors.left : side === "right" ? colors.right : colors.boxBorder);
@@ -145,6 +155,34 @@ export const Scene2_Divide: React.FC = () => {
           );
         })
       )}
+
+      {/* dashed cut lines: appear just before each split, fade as halves slide apart */}
+      <svg width={WIDTH} height={720} style={{ position: "absolute", left: 0, top: 0, pointerEvents: "none" }}>
+        {[1, 2, 3].map((l) => {
+          const s = LEVEL_START[l];
+          const op = interpolate(frame, [s - CUT_LEAD, s - CUT_LEAD + 5, s, s + 10], [0, 1, 1, 0], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
+          if (op <= 0) return null;
+          const grow = interpolate(frame, [s - CUT_LEAD, s - CUT_LEAD + 6], [0, 1], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
+          const rowTop = l === 1 ? ROW_Y[0] - 30 + 30 * progress[0] : ROW_Y[l - 1];
+          const top = rowTop - 12;
+          const len = (SIZE + 24) * grow;
+          return cutXs(l).map((x, ci) => (
+            <line
+              key={`cut-${l}-${ci}`}
+              x1={x}
+              y1={top}
+              x2={x}
+              y2={top + len}
+              stroke={colors.accent}
+              strokeWidth={3}
+              strokeDasharray="8 6"
+              strokeLinecap="round"
+              opacity={op}
+              style={{ filter: `drop-shadow(0 0 4px ${colors.accent})` }}
+            />
+          ));
+        })}
+      </svg>
 
       <div
         style={{
