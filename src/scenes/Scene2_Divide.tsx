@@ -1,6 +1,6 @@
 import React from "react";
-import { AbsoluteFill, Audio, interpolate, interpolateColors, spring, staticFile, useCurrentFrame, useVideoConfig } from "remotion";
-import { ARRAY, colors, font, WIDTH } from "../theme";
+import { AbsoluteFill, Audio, interpolate, spring, staticFile, useCurrentFrame, useVideoConfig } from "remotion";
+import { ARRAY, WIDTH } from "../theme";
 
 // Narration is 9.56s -> ceil(9.56*30) + 30 padding
 export const DURATION = 317;
@@ -65,7 +65,21 @@ const cutXs = (l: number): number[] =>
     });
 
 const sideOf = (l: number, i: number) => LEVELS[l].find((g) => i >= g.start && i < g.end)!.side;
-const sideColor = (side: Group["side"]) => (side === "left" ? colors.left : side === "right" ? colors.right : colors.boxBorder);
+
+// Blueprint palette (scene-local)
+const bp = {
+  bg: "#1d4e89",
+  line: "#ffffff",
+  cyan: "#bde8ff",
+  faint: "rgba(255,255,255,0.55)",
+  cut: "#ff4d4d",
+};
+const mono = "Consolas, 'Courier New', monospace";
+const GRID =
+  "repeating-linear-gradient(0deg, rgba(255,255,255,0.22) 0 1.5px, transparent 1.5px 100px)," +
+  "repeating-linear-gradient(90deg, rgba(255,255,255,0.22) 0 1.5px, transparent 1.5px 100px)," +
+  "repeating-linear-gradient(0deg, rgba(255,255,255,0.08) 0 1px, transparent 1px 20px)," +
+  "repeating-linear-gradient(90deg, rgba(255,255,255,0.08) 0 1px, transparent 1px 20px)";
 
 const CAPTIONS: { from: number; text: string }[] = [
   { from: 0, text: "Split the list in half" },
@@ -84,11 +98,20 @@ export const Scene2_Divide: React.FC = () => {
   const caption = [...CAPTIONS].reverse().find((c) => frame >= c.from)!;
   const captionFade = interpolate(frame - caption.from, [0, 12], [0, 1], { extrapolateRight: "clamp" });
 
+  const LABEL_H = 22; // space reserved above each row for L/R labels / checkmarks
+
   return (
-    <AbsoluteFill style={{ background: colors.bg, fontFamily: font, color: colors.text }}>
+    <AbsoluteFill style={{ backgroundColor: bp.bg, backgroundImage: GRID, fontFamily: mono, color: bp.line }}>
       <Audio src={staticFile("audio/scene2.wav")} />
 
-      <div style={{ position: "absolute", top: 24, width: "100%", textAlign: "center", fontSize: 40, fontWeight: 700 }}>Divide</div>
+      {/* drawing border */}
+      <div style={{ position: "absolute", inset: 14, border: `2px solid ${bp.faint}` }} />
+
+      {/* title */}
+      <div style={{ position: "absolute", top: 34, left: 44 }}>
+        <span style={{ fontSize: 34, fontWeight: 700, letterSpacing: 12, borderBottom: `2px solid ${bp.line}` }}>DIVIDE</span>
+        <div style={{ fontSize: 13, letterSpacing: 4, color: bp.cyan, marginTop: 6 }}>FIG. 2 — RECURSIVE SPLIT</div>
+      </div>
 
       {/* connector lines from parent group to child group */}
       <svg width={WIDTH} height={720} style={{ position: "absolute", left: 0, top: 0 }}>
@@ -98,24 +121,86 @@ export const Scene2_Divide: React.FC = () => {
             const parent = LEVELS[l - 1].find((p) => g.start >= p.start && g.end <= p.end)!;
             const px = (XS[l - 1][parent.start] + XS[l - 1][parent.end - 1] + SIZE) / 2;
             const cx = (XS[l][g.start] + XS[l][g.end - 1] + SIZE) / 2;
-            const y1 = ROW_Y[l - 1] + SIZE + 4;
-            const y2 = ROW_Y[l] - 6;
+            const y1 = ROW_Y[l - 1] + SIZE + 3;
+            const y2 = ROW_Y[l] - (l === 3 ? 34 : LABEL_H + 4);
             const p = progress[l];
+            if (frame < LEVEL_START[l]) return null;
             return (
-              <line
-                key={`${l}-${gi}`}
-                x1={px}
-                y1={y1}
-                x2={px + (cx - px) * p}
-                y2={y1 + (y2 - y1) * p}
-                stroke={colors.muted}
-                strokeWidth={2}
-                opacity={0.6 * Math.min(1, p)}
-              />
+              <g key={`${l}-${gi}`} opacity={Math.min(1, p)}>
+                <line x1={px} y1={y1} x2={px + (cx - px) * p} y2={y1 + (y2 - y1) * p} stroke={bp.cyan} strokeWidth={1.5} />
+                <circle cx={px} cy={y1} r={2.5} fill={bp.cyan} />
+              </g>
             );
           });
         })}
       </svg>
+
+      {/* L / R labels above groups, checkmarks above leaves */}
+      {LEVELS.map((groups, l) =>
+        groups.map((g, gi) => {
+          if (l === 0 || frame < LEVEL_START[l]) return null;
+          const p = progress[l];
+          const left = XS[l][g.start];
+          const w = XS[l][g.end - 1] + SIZE - left;
+          const isLeaf = l === 3;
+          const labelOp = Math.min(1, p) * (isLeaf ? 1 - sortedGlow : 1);
+          const label = g.side === "left" ? "L" : "R";
+          return (
+            <React.Fragment key={`lbl-${l}-${gi}`}>
+              <div
+                style={{
+                  position: "absolute",
+                  left,
+                  width: w,
+                  top: ROW_Y[l] - LABEL_H,
+                  height: LABEL_H - 4,
+                  borderTop: `1px solid ${bp.faint}`,
+                  borderLeft: `1px solid ${bp.faint}`,
+                  borderRight: `1px solid ${bp.faint}`,
+                  boxSizing: "border-box",
+                  opacity: labelOp,
+                }}
+              >
+                <span
+                  style={{
+                    position: "absolute",
+                    left: "50%",
+                    top: -11,
+                    transform: "translateX(-50%)",
+                    background: bp.bg,
+                    padding: "0 5px",
+                    fontSize: 15,
+                    fontWeight: 700,
+                    color: bp.cyan,
+                    lineHeight: "20px",
+                  }}
+                >
+                  {label}
+                </span>
+              </div>
+              {isLeaf && (
+                <div
+                  style={{
+                    position: "absolute",
+                    left,
+                    width: w,
+                    top: ROW_Y[l] - 30,
+                    lineHeight: "26px",
+                    textAlign: "center",
+                    fontSize: 22,
+                    fontWeight: 700,
+                    color: bp.line,
+                    opacity: sortedGlow,
+                    transform: `scale(${0.6 + 0.4 * sortedGlow})`,
+                  }}
+                >
+                  ✓
+                </div>
+              )}
+            </React.Fragment>
+          );
+        })
+      )}
 
       {LEVELS.map((_, l) =>
         ARRAY.map((v, i) => {
@@ -125,9 +210,7 @@ export const Scene2_Divide: React.FC = () => {
           const fromY = l === 0 ? ROW_Y[0] - 30 : ROW_Y[l - 1];
           const x = fromX + (XS[l][i] - fromX) * p;
           const y = fromY + (ROW_Y[l] - fromY) * p;
-          const base = sideColor(sideOf(l, i));
           const isLeaf = l === 3;
-          const border = isLeaf ? interpolateColors(sortedGlow, [0, 1], [base, colors.sorted]) : base;
           return (
             <div
               key={`${l}-${i}`}
@@ -137,26 +220,26 @@ export const Scene2_Divide: React.FC = () => {
                 top: y,
                 width: SIZE,
                 height: SIZE,
-                borderRadius: 12,
-                background: colors.box,
-                border: `3px solid ${border}`,
+                border: `2px solid ${bp.line}`,
                 boxSizing: "border-box",
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
-                fontSize: 28,
+                fontSize: 26,
                 fontWeight: 700,
                 opacity: Math.min(1, p * 1.5),
-                boxShadow: isLeaf && sortedGlow > 0 ? `0 0 ${18 * sortedGlow}px ${colors.sorted}` : "none",
+                outline: isLeaf && sortedGlow > 0 ? `1px dashed rgba(189,232,255,${sortedGlow})` : "none",
+                outlineOffset: 4,
               }}
             >
               {v}
+              <span style={{ position: "absolute", left: 3, top: 1, fontSize: 9, color: bp.cyan, fontWeight: 400 }}>{i}</span>
             </div>
           );
         })
       )}
 
-      {/* dashed cut lines: appear just before each split, fade as halves slide apart */}
+      {/* red dashed "cut here" lines: appear just before each split, fade as halves slide apart */}
       <svg width={WIDTH} height={720} style={{ position: "absolute", left: 0, top: 0, pointerEvents: "none" }}>
         {[1, 2, 3].map((l) => {
           const s = LEVEL_START[l];
@@ -164,38 +247,52 @@ export const Scene2_Divide: React.FC = () => {
           if (op <= 0) return null;
           const grow = interpolate(frame, [s - CUT_LEAD, s - CUT_LEAD + 6], [0, 1], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
           const rowTop = l === 1 ? ROW_Y[0] - 30 + 30 * progress[0] : ROW_Y[l - 1];
-          const top = rowTop - 12;
-          const len = (SIZE + 24) * grow;
+          const top = rowTop - 10;
+          const len = (SIZE + 20) * grow;
           return cutXs(l).map((x, ci) => (
-            <line
-              key={`cut-${l}-${ci}`}
-              x1={x}
-              y1={top}
-              x2={x}
-              y2={top + len}
-              stroke={colors.accent}
-              strokeWidth={3}
-              strokeDasharray="8 6"
-              strokeLinecap="round"
-              opacity={op}
-              style={{ filter: `drop-shadow(0 0 4px ${colors.accent})` }}
-            />
+            <g key={`cut-${l}-${ci}`} opacity={op}>
+              <line x1={x} y1={top} x2={x} y2={top + len} stroke={bp.cut} strokeWidth={2.5} strokeDasharray="7 5" />
+              <text x={x} y={top + len + 4} fontSize={20} fill={bp.cut} textAnchor="middle" dominantBaseline="hanging" transform={`rotate(90 ${x} ${top + len + 14})`}>
+                ✂
+              </text>
+            </g>
           ));
         })}
       </svg>
 
+      {/* caption as a drawing note */}
       <div
         style={{
           position: "absolute",
-          top: 600,
+          top: 588,
           width: "100%",
           textAlign: "center",
-          fontSize: 34,
-          color: caption.from === SORTED_AT ? colors.sorted : colors.muted,
+          fontSize: 26,
+          letterSpacing: 1,
+          color: caption.from === SORTED_AT ? bp.line : bp.cyan,
           opacity: captionFade,
         }}
       >
-        {caption.text}
+        NOTE: {caption.text.toUpperCase()}
+      </div>
+
+      {/* title block */}
+      <div
+        style={{
+          position: "absolute",
+          right: 14,
+          bottom: 14,
+          width: 260,
+          border: `2px solid ${bp.line}`,
+          fontSize: 13,
+          letterSpacing: 2,
+          display: "grid",
+          gridTemplateColumns: "1fr 1fr",
+        }}
+      >
+        <div style={{ gridColumn: "1 / 3", padding: "6px 10px", borderBottom: `1px solid ${bp.line}`, fontWeight: 700, fontSize: 15 }}>MERGE SORT</div>
+        <div style={{ padding: "5px 10px", borderRight: `1px solid ${bp.line}` }}>SHEET 2/6</div>
+        <div style={{ padding: "5px 10px" }}>DIVIDE</div>
       </div>
     </AbsoluteFill>
   );
