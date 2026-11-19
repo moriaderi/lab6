@@ -13,6 +13,9 @@ Each scene version is a git commit tagged `sceneN-vK`. Restore one with:
 | scene5-v1 | 5 Complexity | First version: 4 halving rows, "log n levels" brace, "n work" per row, big O(n log n) (11.1s)
 | scene6-v1 | 6 Recap | First version: three cards Divide / Merge / O(n log n), sorted array glows green (7.4s + hold)
 | scene3-v2 | 3 Merge | Used-up slots stay as faded dashed outlines + 'empty' label, so lists don't vanish and pointers never float over nothing
+| scene4-v2 | 4 Build Up | Label 'fours' -> 'halves' (group of 3 existed); faint tree lines show which pieces merge into which
+| scene5-v2 | 5 Complexity | Accuracy fix: n=8 has 3 merge levels, not 4 -> 'n work' labels moved between rows, brace says log2 8 = 3 levels
+| scene6-v2 | 6 Recap | Merge card text fits one line; sorted array moved up with '[38,...] -> sorted' label
 
 ## Renders
 | File | Commit | Notes |

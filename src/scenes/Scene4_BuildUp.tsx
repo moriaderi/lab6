@@ -18,7 +18,7 @@ const ROWS: number[][][] = [
 ];
 const ROW_Y = [560, 410, 260, 110]; // top of each row (bottom -> top)
 const ROW_START = [0, 75, 135, 185]; // frame each row starts forming, matched to narration
-const ROW_LABEL = ["singles", "pairs", "fours", "sorted!"];
+const ROW_LABEL = ["singles", "pairs", "halves", "sorted!"];
 const FLY = 24; // frames for a box to rise into place
 const STAGGER = 4;
 
@@ -153,6 +153,42 @@ export const Scene4_BuildUp: React.FC = () => {
     });
   });
 
+  // merge-source lines: each group in the row below -> the group it merges into
+  const lines: React.ReactNode[] = [];
+  ROWS.forEach((row, level) => {
+    if (level === 0) return;
+    const start = ROW_START[level];
+    const rowDone = start + (row.flat().length - 1) * STAGGER + FLY;
+    const grow = interpolate(frame, [start, start + 15], [0, 1], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
+    const op = interpolate(frame, [start, start + 8, rowDone, rowDone + 20], [0, 0.6, 0.6, 0.15], {
+      extrapolateLeft: "clamp",
+      extrapolateRight: "clamp",
+    });
+    const groupCenter = (g: number[], lv: number) => {
+      const a = LAYOUTS[lv].get(g[0])!;
+      return a.x + (g.length * S + (g.length - 1) * INNER) / 2;
+    };
+    ROWS[level - 1].forEach((child, ci) => {
+      const parent = row.find((g) => g.includes(child[0]))!;
+      const x1 = groupCenter(child, level - 1);
+      const y1 = ROW_Y[level - 1] - 8;
+      const x2 = groupCenter(parent, level);
+      const y2 = ROW_Y[level] + S + 8;
+      lines.push(
+        <line
+          key={`ln-${level}-${ci}`}
+          x1={x1}
+          y1={y1}
+          x2={x1 + (x2 - x1) * grow}
+          y2={y1 + (y2 - y1) * grow}
+          stroke={colors.muted}
+          strokeWidth={2}
+          opacity={op}
+        />
+      );
+    });
+  });
+
   const labels = ROWS.map((_, level) => {
     const start = ROW_START[level];
     const op = interpolate(frame, [start + 10, start + 25], [0, 1], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
@@ -183,6 +219,9 @@ export const Scene4_BuildUp: React.FC = () => {
       <div style={{ position: "absolute", top: 24, width: "100%", textAlign: "center", fontSize: 36, fontWeight: 700, opacity: titleOp }}>
         Merge back up, level by level
       </div>
+      <svg width={WIDTH} height={720} style={{ position: "absolute", left: 0, top: 0 }}>
+        {lines}
+      </svg>
       {brackets}
       {labels}
       {boxes}
