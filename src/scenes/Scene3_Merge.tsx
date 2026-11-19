@@ -119,7 +119,31 @@ export const Scene3_Merge: React.FC = () => {
 
       {label("Left (sorted)", LEFT_CX, LIST_Y + BOX + 20, colors.left, labelFade)}
       {label("Right (sorted)", RIGHT_CX, LIST_Y + BOX + 20, colors.right, labelFade)}
-      {label("left is empty", LEFT_CX, LIST_Y + 20, colors.muted, leftEmpty)}
+      <div style={{ position: "absolute", left: LEFT_CX - 200, width: 400, top: LIST_Y + BOX + 62, textAlign: "center", fontSize: 22, fontWeight: 500, fontStyle: "italic", color: colors.muted, opacity: leftEmpty }}>
+        empty
+      </div>
+
+      {/* Used-up slots: faded dashed outline where each removed item was */}
+      {ITEMS.map((it, i) => {
+        const k = STEPS.findIndex((s) => s.item === i);
+        const ghost = interpolate(moveProgress(k), [0, 0.4], [0, 0.6], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
+        return (
+          <div
+            key={`ghost-${i}`}
+            style={{
+              position: "absolute",
+              left: homeX(it),
+              top: LIST_Y,
+              width: BOX,
+              height: BOX,
+              borderRadius: 14,
+              border: `3px dashed ${it.list === "left" ? colors.left : colors.right}`,
+              boxSizing: "border-box",
+              opacity: ghost,
+            }}
+          />
+        );
+      })}
 
       {/* Comparison caption */}
       <div style={{ position: "absolute", top: LIST_Y + 14, left: OUT_CX - 170, width: 340, textAlign: "center", fontSize: 30, fontWeight: 600, color: colors.accent, opacity: textFade }}>

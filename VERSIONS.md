@@ -12,6 +12,7 @@ Each scene version is a git commit tagged `sceneN-vK`. Restore one with:
 | scene4-v1 | 4 Build Up | First version: singles -> pairs -> fours -> sorted, rows rise upward, final row green (8.2s)
 | scene5-v1 | 5 Complexity | First version: 4 halving rows, "log n levels" brace, "n work" per row, big O(n log n) (11.1s)
 | scene6-v1 | 6 Recap | First version: three cards Divide / Merge / O(n log n), sorted array glows green (7.4s + hold)
+| scene3-v2 | 3 Merge | Used-up slots stay as faded dashed outlines + 'empty' label, so lists don't vanish and pointers never float over nothing
 
 ## Renders
 | File | Commit | Notes |
